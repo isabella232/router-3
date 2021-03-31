@@ -114,8 +114,7 @@ init([]) ->
             ?WORKER(router_v8, [#{}]),
             ?WORKER(router_device_devaddr, [#{}]),
             ?SUP(router_decoder_custom_sup, []),
-            ?WORKER(router_xor_filter_worker, [#{}]),
-            ?WORKER(router_discovery_worker, [#{}])
+            ?WORKER(router_xor_filter_worker, [#{}])
         ]}}.
 
 %%====================================================================
