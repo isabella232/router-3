@@ -241,10 +241,10 @@ handle_info(
     {ws_message, <<"device:all">>, <<"device:all:discover:devices">>, Map},
     State
 ) ->
-    DeviceID = maps:get(device_id, Map),
-    Hostpost = maps:get(hotspot, Map),
+    DeviceID = maps:get(<<"device_id">>, Map),
+    Hostpost = maps:get(<<"hotspot">>, Map),
     PubKeyBin = libp2p_crypto:b58_to_bin(erlang:binary_to_list(Hostpost)),
-    TxnID = maps:get(transaction_id, Map),
+    TxnID = maps:get(<<"transaction_id">>, Map),
     lager:debug([{device_id, DeviceID}], "starting discovery for ~p/~p (txn id=~p)", [
         DeviceID,
         blockchain_utils:addr2name(PubKeyBin),
@@ -375,7 +375,7 @@ start_discovery(Map) ->
     case
         libp2p_crypto:verify(
             <<Hostpost/binary, TxnID/binary>>,
-            Sig,
+            base64:decode(Sig),
             libp2p_crypto:bin_to_pubkey(PubKeyBin)
         )
     of
@@ -389,7 +389,7 @@ start_discovery(Map) ->
         true ->
             case router_discovery_handler:dial(PubKeyBin) of
                 {error, _Reason} ->
-                    lager:info("failed to dial hotpost ~p: )", [
+                    lager:info("failed to dial hotpost ~p: ~p", [
                         blockchain_utils:addr2name(PubKeyBin),
                         _Reason
                     ]);
