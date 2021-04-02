@@ -8,7 +8,7 @@
 
 -export([disovery_test/1]).
 
--include_lib("helium_proto/include/blockchain_state_channel_v1_pb.hrl").
+-include_lib("helium_proto/include/discovery_pb.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
@@ -56,7 +56,7 @@ disovery_test(Config) ->
     libp2p_swarm:add_stream_handler(
         Swarm,
         router_discovery_handler:version(),
-        {router_discovery_handler, server, []}
+        {router_discovery_handler_test, server, [self()]}
     ),
     [Address | _] = libp2p_swarm:listen_addrs(Swarm),
     {ok, _} = libp2p_swarm:connect(blockchain_swarm:swarm(), Address),
@@ -73,11 +73,12 @@ disovery_test(Config) ->
     Hostpost = erlang:list_to_binary(libp2p_crypto:bin_to_b58(PubKeyBin)),
     TxnID = <<"txn_id_1">>,
     Sig = SigFun(<<Hostpost/binary, ",", TxnID/binary>>),
+    EncodedSig = base64:encode(Sig),
     Map = #{
         <<"hotspot">> => Hostpost,
         <<"transaction_id">> => TxnID,
         <<"device_id">> => <<"device_id_1">>,
-        <<"signature">> => base64:encode(Sig)
+        <<"signature">> => EncodedSig
     },
 
     WSPid =
@@ -86,10 +87,18 @@ disovery_test(Config) ->
         after 2500 -> ct:fail(websocket_init_timeout)
         end,
 
-    WSPid !
-        {discovery, Map},
+    WSPid ! {discovery, Map},
 
-    timer:sleep(250),
+    receive
+        {router_discovery_handler_test, Bin} ->
+            Data = discovery_pb:decode_msg(Bin, discovery_start_pb),
+            #discovery_start_pb{
+                hotspot = PubKeyBin,
+                transaction_id = TxnID,
+                signature = EncodedSig
+            } = Data
+    after 500 -> ct:fail(router_discovery_handler_test_timeout)
+    end,
     ok.
 
 %% ------------------------------------------------------------------
