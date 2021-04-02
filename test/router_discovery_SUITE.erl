@@ -50,36 +50,46 @@ end_per_testcase(TestCase, Config) ->
 %% TEST CASES
 %%--------------------------------------------------------------------
 
-disovery_test(_Config) ->
-    WSPid =
-        receive
-            {websocket_init, P} -> P
-        after 2500 -> ct:fail(websocket_init_timeout)
-        end,
+disovery_test(Config) ->
+    %% Setup stream stuff
+    Swarm = proplists:get_value(swarm, Config),
+    libp2p_swarm:add_stream_handler(
+        Swarm,
+        router_discovery_handler:version(),
+        {router_discovery_handler, server, []}
+    ),
+    [Address | _] = libp2p_swarm:listen_addrs(Swarm),
+    {ok, _} = libp2p_swarm:connect(blockchain_swarm:swarm(), Address),
+    test_utils:wait_until(fun() ->
+        case libp2p_swarm:connect(blockchain_swarm:swarm(), libp2p_swarm:p2p_address(Swarm)) of
+            {ok, _} -> true;
+            _ -> false
+        end
+    end),
 
-    {ok, PubKey, SigFun, _} = blockchain_swarm:keys(),
+    #{secret := PrivKey, public := PubKey} = proplists:get_value(keys, Config),
+    SigFun = libp2p_crypto:mk_sig_fun(PrivKey),
     PubKeyBin = libp2p_crypto:pubkey_to_bin(PubKey),
     Hostpost = erlang:list_to_binary(libp2p_crypto:bin_to_b58(PubKeyBin)),
     TxnID = <<"txn_id_1">>,
-    Sig = SigFun(<<Hostpost/binary, TxnID/binary>>),
+    Sig = SigFun(<<Hostpost/binary, ",", TxnID/binary>>),
     Map = #{
         <<"hotspot">> => Hostpost,
         <<"transaction_id">> => TxnID,
         <<"device_id">> => <<"device_id_1">>,
         <<"signature">> => base64:encode(Sig)
     },
+
+    WSPid =
+        receive
+            {websocket_init, P} -> P
+        after 2500 -> ct:fail(websocket_init_timeout)
+        end,
+
     WSPid !
         {discovery, Map},
-    ?assert(
-        libp2p_crypto:verify(
-            <<Hostpost/binary, TxnID/binary>>,
-            Sig,
-            libp2p_crypto:bin_to_pubkey(PubKeyBin)
-        )
-    ),
 
     timer:sleep(250),
-    ?assert(false),
     ok.
 
 %% ------------------------------------------------------------------

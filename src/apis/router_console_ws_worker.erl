@@ -374,7 +374,7 @@ start_discovery(Map) ->
     DeviceID = maps:get(<<"device_id">>, Map),
     case
         libp2p_crypto:verify(
-            <<Hostpost/binary, TxnID/binary>>,
+            <<Hostpost/binary, ",", TxnID/binary>>,
             base64:decode(Sig),
             libp2p_crypto:bin_to_pubkey(PubKeyBin)
         )

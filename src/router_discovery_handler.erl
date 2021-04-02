@@ -63,6 +63,7 @@ init(client, _Conn, _Args) ->
 init(server, _Conn, _Args) ->
     lager:info("server started with ~p", [_Args]),
     {ok, #state{}}.
+
 handle_data(_Type, _Data, State) ->
     lager:warning("~p got data ~p", [_Type, _Data]),
     {noreply, State}.
